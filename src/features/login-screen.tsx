@@ -1,68 +1,69 @@
-"use client"
-
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useFormik } from "formik"
+import * as Yup from "yup"
 import { AlertCircle, Eye, EyeOff } from "lucide-react"
+import { api } from "@/connection"
+import { useNavigate } from "react-router-dom"
 
-interface LoginScreenProps {
-  onLogin: () => void
+
+interface FormValues {
+  email: string
+  password: string
+  rememberMe: boolean
 }
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [rememberMe, setRememberMe] = useState(false)
+const validationSchema = Yup.object({
+  email: Yup.string()
+    .email("Por favor ingresa un correo válido")
+    .required("El correo es requerido"),
+  password: Yup.string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .required("La contraseña es requerida"),
+  rememberMe: Yup.boolean(),
+})
+
+export default function LoginScreen() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+
+  const formik = useFormik<FormValues>({
+    initialValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
+    validationSchema,
+    onSubmit: async(values) => {
+      if (values.rememberMe) {
+        localStorage.setItem("algae-remembered-email", values.email)
+        localStorage.setItem("algae-remember-me", "true")
+      } else {
+        localStorage.removeItem("algae-remembered-email")
+        localStorage.setItem("algae-remember-me", "false")
+      }
+
+      const res = await api.post("/auth/login",{email:values.email, password:values.password})
+      if (res.data.access_token){
+        localStorage.setItem("at_biogeles",res.data.access_token)
+        navigate("/dashboard")
+      }
+
+
+    },
+  })
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("algae-remembered-email")
     const wasRemembered = localStorage.getItem("algae-remember-me") === "true"
+
     if (savedEmail && wasRemembered) {
-      setEmail(savedEmail)
-      setRememberMe(true)
+      formik.setValues({
+        email: savedEmail,
+        password: "",
+        rememberMe: true,
+      })
     }
-  }, [])
-
-  const validateEmail = (email: string): string | undefined => {
-    if (!email) return "El correo es requerido"
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) return "Por favor ingresa un correo válido"
-    return undefined
-  }
-
-  const validatePassword = (password: string): string | undefined => {
-    if (!password) return "La contraseña es requerida"
-    if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres"
-    return undefined
-  }
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newErrors: { email?: string; password?: string } = {}
-
-    const emailError = validateEmail(email)
-    const passwordError = validatePassword(password)
-
-    if (emailError) newErrors.email = emailError
-    if (passwordError) newErrors.password = passwordError
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      return
-    }
-
-    if (rememberMe) {
-      localStorage.setItem("algae-remembered-email", email)
-      localStorage.setItem("algae-remember-me", "true")
-    } else {
-      localStorage.removeItem("algae-remembered-email")
-      localStorage.setItem("algae-remember-me", "false")
-    }
-
-    onLogin()
-  }
+  }, [formik])
 
   return (
     <div className="min-h-screen bg-white flex flex-col justify-center px-6 py-12 relative overflow-hidden">
@@ -73,54 +74,60 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="relative z-10 max-w-md w-full mx-auto">
         {/* Logo and Header */}
         <div className="text-center mb-12">
-          
-          <h1 className="text-3xl font-bold text-foreground mb-2" style={{ fontFamily: "var(--font-heading)" }}>
+          <h1
+            className="text-3xl font-bold text-foreground mb-2"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
             Gestión de Algas
           </h1>
-          <p className="text-muted-foreground text-sm">Plataforma de producción marina</p>
+          <p className="text-muted-foreground text-sm">
+            Plataforma de producción marina
+          </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={formik.handleSubmit} className="space-y-5">
           {/* Email Field */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Correo Electrónico</label>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Correo Electrónico
+            </label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                if (errors.email) setErrors({ ...errors, email: undefined })
-              }}
+              name="email"
+              value={formik.values.email}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
               placeholder="usuario@empresa.com"
               className={`w-full px-4 py-3 rounded-lg border-2 transition-all focus:outline-none ${
-                errors.email
+                formik.touched.email && formik.errors.email
                   ? "border-destructive focus:ring-2 focus:ring-destructive/20"
                   : "border-border focus:border-primary focus:ring-2 focus:ring-primary/10"
               } bg-background`}
             />
-            {errors.email && (
+            {formik.touched.email && formik.errors.email && (
               <div className="flex items-center gap-2 mt-2 text-destructive text-sm">
                 <AlertCircle className="w-4 h-4" />
-                {errors.email}
+                {formik.errors.email}
               </div>
             )}
           </div>
 
           {/* Password Field */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Contraseña</label>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Contraseña
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (errors.password) setErrors({ ...errors, password: undefined })
-                }}
+                name="password"
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 placeholder="••••••••"
                 className={`w-full px-4 py-3 rounded-lg border-2 transition-all focus:outline-none pr-12 ${
-                  errors.password
+                  formik.touched.password && formik.errors.password
                     ? "border-destructive focus:ring-2 focus:ring-destructive/20"
                     : "border-border focus:border-primary focus:ring-2 focus:ring-primary/10"
                 } bg-background`}
@@ -130,21 +137,38 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </button>
             </div>
-            {errors.password && (
+            {formik.touched.password && formik.errors.password && (
               <div className="flex items-center gap-2 mt-2 text-destructive text-sm">
                 <AlertCircle className="w-4 h-4" />
-                {errors.password}
+                {formik.errors.password}
               </div>
             )}
           </div>
 
-          {/* Remember and Forgot Password */}
+          {/* Remember & Forgot Password */}
           <div className="flex items-center justify-between text-sm">
-            
-            <button type="button" className="text-primary hover:text-accent font-medium transition-colors">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="rememberMe"
+                checked={formik.values.rememberMe}
+                onChange={formik.handleChange}
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="text-foreground">Recordar correo</span>
+            </label>
+
+            <button
+              type="button"
+              className="text-primary hover:text-accent font-medium transition-colors"
+            >
               ¿Olvidaste tu contraseña?
             </button>
           </div>
@@ -161,14 +185,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
             ¿No tienes cuenta?{" "}
-            <button type="button" className="text-primary hover:text-accent font-medium transition-colors">
+            <button
+              type="button"
+              className="text-primary hover:text-accent font-medium transition-colors"
+            >
               Regístrate aquí
             </button>
           </p>
         </div>
-
-        {/* Demo Credentials */}
-        
       </div>
     </div>
   )

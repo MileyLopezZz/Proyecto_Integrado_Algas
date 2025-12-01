@@ -13,6 +13,7 @@ import ProfileScreen from "@/features/profile-screen";
 import ReportsScreen from "@/features/reports-screen";
 import CalendarScreen from "@/features/calendar-screen";
 import WeatherScreen from "@/features/weather-screen";
+import ProtectedLayout from "./guards/protected-layout";
 
 export function AppRouter() {
     return (
@@ -26,13 +27,15 @@ export function AppRouter() {
                 {/* Rutas internas (con mainLayout + BottomNav) */}
 
                 <Route element={<MainLayout />}>
-                    <Route path="/dashboard" element={<DashboardScreen />} />
-                    <Route path="/orders" element={<OrdersScreen />} />
-                    <Route path="/calendar" element={<CalendarScreen />} />
-                    <Route path="/weather" element={<WeatherScreen />} />
-                    <Route path="/reports" element={<ReportsScreen />} />
-                    <Route path="/admin" element={<AdminScreen />} />
-                    <Route path="/profile" element={<ProfileScreen />} />
+                    <Route element={<ProtectedLayout />}>
+                        <Route path="/dashboard" element={<DashboardScreen />} />
+                        <Route path="/orders" element={<OrdersScreen />} />
+                        <Route path="/calendar" element={<CalendarScreen />} />
+                        <Route path="/weather" element={<WeatherScreen />} />
+                        <Route path="/reports" element={<ReportsScreen />} />
+                        <Route path="/admin" element={<AdminScreen />} />
+                        <Route path="/profile" element={<ProfileScreen />} />
+                    </Route>
                 </Route>
             </Routes>
         </BrowserRouter>
